@@ -104,7 +104,8 @@ Clean, text-focused layout
 ## **Button Flow:**
 ```
 Press A → Press A → Press A → (loops)
-Cluster   Stats     Fancy     Cluster...
+Cluster   Stats     Detailed     Cluster...
+```
 
 ### When to Use Each Mode:
 Mode | Best For | Update Speed |
