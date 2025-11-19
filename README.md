@@ -84,7 +84,6 @@ Clean, text-focused layout
 ```
 
 ```
-
 **Features:**
 - **Top right:** WiFi signal bars + signal strength (dBm)
 - **Top left:** CPU temperature (color-coded)
