@@ -5,6 +5,7 @@ also providing its own hashrate.
 
 ### M5Stack S2 SOLO SWARM Dashboard
 ### **Cluster View**
+```
 ┌─────────────────────────────────┐
 │  SOLO SWARM CLUSTER             │
 │  168.5 KH/s | 6 miners          │
@@ -21,7 +22,7 @@ also providing its own hashrate.
 │ Pool: solo.ckpool.org:3333      │
 └─────────────────────────────────┘
   BtnA: Stats
-
+```
 Features:
 
 Real-time view of all miners
@@ -32,6 +33,7 @@ Total cluster hashrate at top
 Perfect for monitoring cluster health
 
 ### **Cluster Statistics**
+```
 ┌─────────────────────────────────┐
 │  CLUSTER STATISTICS             │
 ├─────────────────────────────────┤
@@ -48,7 +50,7 @@ Perfect for monitoring cluster health
 │ Pool: solo.ckpool.org:3333      │
 └─────────────────────────────────┘
   BtnA: Detailed View
-
+```
 Features:
 
 Aggregate cluster statistics
@@ -61,6 +63,7 @@ Network info
 Clean, text-focused layout
 
 ### **Detailed View**
+```
 ┌─────────────────────────────────┐
 │  HAN SOLO   68°C    ▂▄▆█ -62dB│
 ├─────────────────────────────────┤
@@ -78,6 +81,8 @@ Clean, text-focused layout
 │ solo.ckpool.org:3333            │
 └─────────────────────────────────┘
   BtnA: Cluster View
+```
+
 ```
 
 **Features:**
