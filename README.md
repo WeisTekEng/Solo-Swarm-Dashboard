@@ -1,7 +1,14 @@
 # Solo-Swarm-Dashboard
 A Lottery ticket M5Stack S2 Dashboard for the Solo Swarm repo
 The Solo Swarm Dashboard keeps tabs on all your Solo Swarm Miners while
-also providing its own hashrate.
+also providing its own hashrate. Currently the dashboard provides ~35.75 kh/s to
+the swarm using 2 cores at 240Mhz with 4 threads.
+
+# Note: Hardware Acceleration
+The Hardware Accelerated Branch is not a thing, the esp32 s2/s3 does have a 
+cryptographic module that supports sha1 and 2 but it only does the first 64bytes
+and does not support midstate or anything else thats needed by bitcoin. use the main
+branch for the software optimized BitcoinMiner and Sha256 code.
 
 ### M5Stack S2 SOLO SWARM Dashboard
 ### **Cluster View**
@@ -131,5 +138,3 @@ Detailed | Deep dive with all sensors active | Every 2s
 🟢 Green: >50% or Charging
 🟡 Yellow: 20-50%
 🔴 Red: <20%
-
-All three modes update in real-time and show live data from your mining cluster
