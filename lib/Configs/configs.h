@@ -3,8 +3,8 @@
 #define CONFIGS_H
 
 // Wifi
-static const char* WIFI_SSID = "Lanyard-WRT"; // 2.5Ghz
-static const char* WIFI_PASSWORD = "aS137946285!";
+static const char* WIFI_SSID = "YOUR_WIFI_SSID"; // 2.5Ghz
+static const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD!";
 
 // Mining
 static const int THREADS = 4;
