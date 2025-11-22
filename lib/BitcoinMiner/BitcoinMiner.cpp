@@ -176,7 +176,7 @@ void BitcoinMiner::mineWithMidstate(uint8_t* target) {
     uint8_t hash[32] __attribute__((aligned(4)));
     
     // CRITICAL: Much larger batch for maximum speed
-    const uint32_t BATCH = 50000;
+    //const uint32_t BATCH = 50000;
     const uint32_t REPORT_INTERVAL = 500000;
     
     // Cache connection status - only check occasionally

@@ -6,6 +6,12 @@
 #include "sha256.h"
 #include "MiningCore.h"
 
+#define ULTRA_FAST_MODE
+#ifdef ULTRA_FAST_MODE
+    const uint32_t BATCH = 100000;  // Even bigger batches
+    #define CHECK_CONNECTION_INTERVAL 1000000  // Check less often
+#endif
+
 class BitcoinMiner {
 public:
     BitcoinMiner(const char* name, uint8_t core);
