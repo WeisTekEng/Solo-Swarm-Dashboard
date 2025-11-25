@@ -13,4 +13,4 @@ void IRAM_ATTR sha256_bitcoin_double(const uint8_t* data, size_t len, uint8_t* h
 
 // Ultra-fast midstate mining
 void IRAM_ATTR sha256_midstate_init(uint32_t* midstate, const uint8_t* header64);
-void IRAM_ATTR sha256_final_rounds_with_nonce(const uint32_t* midstate, uint32_t nonce, uint8_t* hash);
+bool IRAM_ATTR sha256_final_rounds_with_nonce(const uint32_t* midstate, uint32_t nonce, uint8_t* hash);

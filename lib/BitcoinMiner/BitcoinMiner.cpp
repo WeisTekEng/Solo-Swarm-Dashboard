@@ -1,13 +1,18 @@
-// BitcoinMiner.cpp - ULTRA OPTIMIZED
+// ============================================================================
+// BitcoinMiner.cpp - FULLY OPTIMIZED
+// ============================================================================
 #include "BitcoinMiner.h"
 #include "configs.h"
-#include <M5Core2.h>
 
-// Queue for submitting shares without blocking mining
+#ifdef M5CORE2
+#include <M5Core2.h>
+#endif
+
+// ✅ OPTIMIZATION: Smaller, more efficient share submission structure
 struct ShareSubmission {
-    String job_id;
-    String extranonce2;
-    String ntime;
+    char job_id[64];
+    char extranonce2[32];
+    char ntime[16];
     uint32_t nonce;
     bool valid;
 };
@@ -22,7 +27,7 @@ BitcoinMiner::BitcoinMiner(const char* name, uint8_t core)
 }
 
 void BitcoinMiner::start() {
-    setCpuFrequencyMhz(240);
+    //setCpuFrequencyMhz(240);
     
     while (true) {
         connectToPool(POOL_URL, POOL_PORT);
@@ -61,34 +66,44 @@ void BitcoinMiner::start() {
     }
 }
 
+// ✅ OPTIMIZED: Reduced String operations
 void BitcoinMiner::shareSubmissionTask() {
     ShareSubmission sub;
+    char payload[256];  // Pre-allocated buffer
+    
     while (true) {
         if (xQueueReceive(shareQueue, &sub, portMAX_DELAY)) {
             char nonceHex[9];
             snprintf(nonceHex, 9, "%08x", sub.nonce);
-            String payload = "{\"id\":9,\"method\":\"mining.submit\",\"params\":[\"";
-            payload += String(ADDRESS) + "\",\"" + sub.job_id + "\",\"";
-            payload += sub.extranonce2 + "\",\"" + sub.ntime + "\",\"" + nonceHex + "\"]}\n";
+            
+            // ✅ Single snprintf instead of String concatenation
+            snprintf(payload, sizeof(payload),
+                "{\"id\":9,\"method\":\"mining.submit\",\"params\":[\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"]}\n",
+                ADDRESS, sub.job_id, sub.extranonce2, sub.ntime, nonceHex);
+            
             client.print(payload);
             
             if (sub.valid) {
-                // Block found celebration
+#ifdef M5CORE2
+                // Block found celebration - only on M5Core2
                 for (int f = 0; f < 15; f++) {
                     M5.Lcd.fillScreen(GREEN); 
                     vTaskDelay(80 / portTICK_PERIOD_MS);
                     M5.Lcd.fillScreen(BLACK); 
                     vTaskDelay(80 / portTICK_PERIOD_MS);
                 }
+#else
+                Serial.println("\n*** BLOCK FOUND! ***\n");
+#endif
             }
         }
     }
 }
 
-void BitcoinMiner::connectToPool(const char* host, uint16_t port) {
+void BitcoinMiner::connectToPool(String host, uint16_t port) {
     client.setTimeout(10000);
     client.setNoDelay(true);
-    while (!client.connect(host, port)) {
+    while (!client.connect(host.c_str(), port)) {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
@@ -101,6 +116,9 @@ void BitcoinMiner::subscribeAndAuth() {
     line = client.readStringUntil('\n');
     deserializeJson(doc, line);
     extranonce1 = doc["result"][1].as<String>();
+    
+    // ✅ Copy to buffer for fast access
+    strncpy(extranonce1_buf, extranonce1.c_str(), sizeof(extranonce1_buf) - 1);
 
     client.readStringUntil('\n');
     client.print("{\"id\":2,\"method\":\"mining.authorize\",\"params\":[\"" + String(ADDRESS) + "\",\"x\"]}\n");
@@ -124,10 +142,13 @@ bool BitcoinMiner::getNewJob() {
     String nbits    = params[6].as<String>();
     ntime           = params[7].as<String>();
 
+    // ✅ Copy to buffers for fast access in mining loop
+    strncpy(job_id_buf, job_id.c_str(), sizeof(job_id_buf) - 1);
+    strncpy(ntime_buf, ntime.c_str(), sizeof(ntime_buf) - 1);
+
     uint32_t r1 = esp_random(), r2 = esp_random();
-    char en2[17];
-    snprintf(en2, sizeof(en2), "%08x%08x", r1, r2);
-    extranonce2 = en2;
+    snprintf(extranonce2_buf, sizeof(extranonce2_buf), "%08x%08x", r1, r2);
+    extranonce2 = extranonce2_buf;
 
     String coinbase_hex = coinb1 + extranonce1 + extranonce2 + coinb2;
     uint8_t coinbase_bin[512];
@@ -170,75 +191,122 @@ bool BitcoinMiner::getNewJob() {
     return true;
 }
 
+// ✅ FULLY OPTIMIZED MINING LOOP
 void BitcoinMiner::mineWithMidstate(uint8_t* target) {
     uint32_t nonce = 0;
     uint32_t local_hashes = 0;
+    uint32_t local_halfshares = 0;
+    uint32_t local_shares = 0;
     uint8_t hash[32] __attribute__((aligned(4)));
+
+    // ✅ OPTIMIZATION: Larger batch, less frequent updates
+    const uint32_t BATCH = 100000;
+    const uint32_t STATS_UPDATE_INTERVAL = 175000;  // Update every 500k hashes
     
-    // CRITICAL: Much larger batch for maximum speed
-    //const uint32_t BATCH = 50000;
-    const uint32_t REPORT_INTERVAL = 500000;
-    
-    // Cache connection status - only check occasionally
     bool is_connected = true;
     uint32_t last_connection_check = 0;
+    uint32_t stats_update_counter = 0;
 
     while (nonce < 0xFFFFFFFF && is_connected) {
-        // TIGHT INNER LOOP - NO BRANCHES
+        // ============================================================
+        // ULTRA-TIGHT INNER LOOP
+        // ============================================================
         for (uint32_t i = 0; i < BATCH && nonce < 0xFFFFFFFF; i++, nonce++) {
-            sha256_final_rounds_with_nonce(midstate.state, nonce, hash);
-            local_hashes++;
-
-            // Fast path: most hashes fail all checks
-            // Only check if last bytes are promising
-            uint32_t tail = *(uint32_t*)(hash + 28);
-            
-            if (tail == 0) {  // 32-bit share or better!
-                // Update stats WITHOUT network I/O
-                xSemaphoreTake(statsMutex, portMAX_DELAY);
-                halfshares++;
-                shares++;
-                xSemaphoreGive(statsMutex);
+            // ✅ NEW: sha256_final_rounds_with_nonce returns bool (early exit)
+            if (sha256_final_rounds_with_nonce(midstate.state, nonce, hash)) {
+                local_hashes++;
                 
-                // Queue share for async submission
-                ShareSubmission sub;
-                sub.job_id = job_id;
-                sub.extranonce2 = extranonce2;
-                sub.ntime = ntime;
-                sub.nonce = nonce;
-                sub.valid = checkValid(hash, target);
+                // Potential share! Check difficulty
+                uint32_t tail = *(uint32_t*)(hash + 28);
                 
-                if (sub.valid) {
-                    xSemaphoreTake(statsMutex, portMAX_DELAY);
-                    valids++;
-                    blockFound = true;
-                    blockFoundTime = millis();
-                    xSemaphoreGive(statsMutex);
+                if (__builtin_expect(tail == 0, 0)) {
+                    // 32-bit share or better
+                    local_halfshares++;
+                    local_shares++;
+                    
+                    // ✅ OPTIMIZATION: Copy to char buffers (no String in hot path)
+                    ShareSubmission sub;
+                    strncpy(sub.job_id, job_id_buf, sizeof(sub.job_id) - 1);
+                    strncpy(sub.extranonce2, extranonce2_buf, sizeof(sub.extranonce2) - 1);
+                    strncpy(sub.ntime, ntime_buf, sizeof(sub.ntime) - 1);
+                    sub.nonce = nonce;
+                    sub.valid = checkValid(hash, target);
+                    
+                    if (sub.valid) {
+                        // ✅ Only lock for valid blocks
+                        xSemaphoreTake(statsMutex, portMAX_DELAY);
+                        valids++;
+                        blockFound = true;
+                        blockFoundTime = millis();
+                        xSemaphoreGive(statsMutex);
+                    }
+                    
+                    xQueueSend(shareQueue, &sub, 0);  // Non-blocking
+                    
+                    if (sub.valid) {
+                        // Update final stats before returning
+                        xSemaphoreTake(statsMutex, portMAX_DELAY);
+                        hashes += local_hashes;
+                        halfshares += local_halfshares;
+                        shares += local_shares;
+                        xSemaphoreGive(statsMutex);
+                        return;
+                    }
+                } else if ((tail & 0x0000FFFF) == 0) {
+                    // 16-bit half-share
+                    local_halfshares++;
                 }
-                
-                xQueueSend(shareQueue, &sub, 0);  // Non-blocking
-                
-                if (sub.valid) {
-                    return;  // Exit on valid block
-                }
-            } else if ((tail & 0x0000FFFF) == 0) {  // 16-bit half-share
-                xSemaphoreTake(statsMutex, portMAX_DELAY);
-                halfshares++;
-                xSemaphoreGive(statsMutex);
+            } else {
+                // Early exit - not even a 16-bit share
+                local_hashes++;
             }
         }
 
-        // Update global counter
-        xSemaphoreTake(statsMutex, portMAX_DELAY);
-        hashes += local_hashes;
-        xSemaphoreGive(statsMutex);
-        local_hashes = 0;
+        // ============================================================
+        // UPDATE STATS - Only every 1M hashes
+        // ============================================================
+        stats_update_counter += BATCH;
+        if (stats_update_counter >= STATS_UPDATE_INTERVAL) {
+            xSemaphoreTake(statsMutex, portMAX_DELAY);
+            hashes += local_hashes;
+            halfshares += local_halfshares;
+            shares += local_shares;
+            xSemaphoreGive(statsMutex);
+            
+            local_hashes = 0;
+            local_halfshares = 0;
+            local_shares = 0;
+            stats_update_counter = 0;
+        }
         
-        // Check connection only every 500k hashes (~15 seconds)
-        if (nonce - last_connection_check > REPORT_INTERVAL) {
+        // ✅ Check connection only every 1M hashes
+        if (nonce - last_connection_check > STATS_UPDATE_INTERVAL) {
             is_connected = client.connected();
             last_connection_check = nonce;
-            taskYIELD();  // Brief yield for other tasks
+            
+            // Update any remaining stats
+            if (local_hashes > 0) {
+                xSemaphoreTake(statsMutex, portMAX_DELAY);
+                hashes += local_hashes;
+                halfshares += local_halfshares;
+                shares += local_shares;
+                xSemaphoreGive(statsMutex);
+                
+                local_hashes = 0;
+                local_halfshares = 0;
+                local_shares = 0;
+            }
+            
+            taskYIELD();  // Brief yield
         }
+    }
+    
+    // Final stats update
+    if (local_hashes > 0) {
+        xSemaphoreTake(statsMutex, portMAX_DELAY);
+        hashes += local_hashes;
+        halfshares += local_halfshares;
+        shares += local_shares;
+        xSemaphoreGive(statsMutex);
     }
 }
